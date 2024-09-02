@@ -1,0 +1,166 @@
+package GEngine;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+//
+///**
+// * MyFinalProject run program that...
+// * @author Eliran Mimoun ;
+// */
+public abstract class GEngine extends JFrame //JPanel implements MouseListener, KeyListener, MouseMotionListener
+{
+    public static boolean DEBUG_MODE_ON = false;
+    public static final double TARGET_FPS = 60.0;
+    public static final double TARGET_TIME = 1000000000 / TARGET_FPS; // in nanoseconds
+
+    public static final String DEFAULT_WINDOW_TITLE = "GEngine 800x600";
+    public static final Color DEFAULT_CANVAS_BG_COLOR = Color.DARK_GRAY;
+
+    public static final Font FONT_HUGE = new Font(Font.MONOSPACED, Font.BOLD, 45);
+    public static final Font FONT_LARG = new Font(Font.MONOSPACED, Font.BOLD, 35);
+    public static final Font FONT_MEDIUM = new Font(Font.MONOSPACED, Font.BOLD, 25);
+    public static final Font FONT_SMALL = new Font(Font.MONOSPACED, Font.BOLD, 20);
+
+    // Attributes תכונות
+    // ------------------------------------------------------------------
+    private String frameTitle;
+    private Color canvasBGcolor;
+    public JPanel canvas;
+    protected Mouse mouse;
+    protected Keyboard keyboard;
+
+    public GEngine(int canvasWidth, int canvasHeight)
+    {
+        this(canvasWidth, canvasHeight, DEFAULT_WINDOW_TITLE);
+    }
+
+    public GEngine(int canvasWidth, int canvasHeight, String title)
+    {
+        this.frameTitle = title;
+        this.canvasBGcolor = DEFAULT_CANVAS_BG_COLOR;
+
+        // setup JFrame for the window
+        super.setTitle(title);
+        super.setResizable(false);
+        super.setIgnoreRepaint(true);
+        super.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // setup JPanel for the canvas (drawing surface)
+        this.canvas = new JPanel();
+        this.canvas.setPreferredSize(new Dimension(canvasWidth, canvasHeight));
+        this.canvas.setIgnoreRepaint(true);
+        this.canvas.setFocusable(true);
+
+        // events listener
+        mouse = new Mouse(canvas);
+        keyboard = new Keyboard(canvas);
+
+        // add canvas to window & show it on screen
+        super.add(canvas, BorderLayout.CENTER);
+        super.pack();
+        super.setLocationRelativeTo(null);
+        super.setVisible(true);
+    }
+
+    public void start()
+    {
+        new Thread(new Runnable() 
+        {
+            @Override
+            public void run() 
+            {
+                runEngineLoop();
+            }
+        }).start();
+    }
+
+    public void runEngineLoop()
+    {
+        double delta = 0;
+        int fps = 0, ups = 0;
+        long lastTime = System.nanoTime(), timer = 0;
+
+        while (true)
+        {
+            long currentTime = System.nanoTime();
+            delta += (currentTime - lastTime) / TARGET_TIME;
+            lastTime = currentTime;
+            fps++;
+
+            while (delta >= 1)
+            {    
+                // update keyboard & mouse status
+                canvas.requestFocus();
+                mouse.checkMouseStatus();
+                keyboard.checkKeyboardStatus();
+                update();
+                renderAndDraw();
+                delta--;
+                ups++;
+            }
+
+            // one sec passed (update fps,ups,timer for debug)
+            if (ups >= TARGET_FPS)
+            {
+                timer++;
+                if (DEBUG_MODE_ON)
+                {
+                    String str = String.format(" [Canvas: %dx%d, UPS: %d, FPS: %d, Timer: %d]", canvas.getWidth(), canvas.getHeight(), ups, fps, timer);
+                    super.setTitle(frameTitle + " " + str);
+                }
+                ups = 0;
+                fps = 0;
+            }
+
+            // sleep some time to free CPU (let other threads CPU time)
+            try
+            {
+                Thread.sleep(1);
+            } catch (InterruptedException e)
+            {
+            }
+        }
+    }
+
+    // for double-buffering drawing (flickers free)
+    private void renderAndDraw()
+    {
+        BufferedImage bufferedImage = new BufferedImage(canvas.getWidth(), canvas.getHeight(), BufferedImage.TYPE_INT_ARGB);
+
+        // create offscreen drawing surface using BufferedImage
+        Graphics2D offg = (Graphics2D) bufferedImage.getGraphics();
+        offg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // claer offscreen
+        offg.setColor(canvasBGcolor);
+        offg.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+        // call sub-class draw on the offscreen drawing surface
+        draw(offg);
+
+        // draw offg on canvas
+        canvas.getGraphics().drawImage(bufferedImage, 0, 0, null);
+    }
+
+    public abstract void update();
+
+    public abstract void draw(Graphics g);
+    
+    public int getcanvasWidth()
+    {
+        return canvas.getWidth();
+    }
+
+    public int getcanvasheight()
+    {
+        return canvas.getHeight();
+    }
+}
