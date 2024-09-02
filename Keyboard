@@ -1,0 +1,93 @@
+package GEngine;
+
+import java.awt.Component;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+
+/**
+ * GEKeybord defines object that...
+ * @author User | 23/05/2024
+ */
+public class Keyboard implements KeyListener
+{
+    private static final int KEY_COUNT = 256;
+
+    private enum KeyState
+    {
+        RELEASED,   // Not down
+        PRESSED,    // Down, but not the first time
+        ONCE        // Down for the first time
+    }
+    
+    private boolean[] currentKeys;     // Current state of the keyboard
+    private KeyState[] keys;            // Polled keyboard state
+    public boolean isControlDown, isAltDown, isShiftDown;
+
+    public Keyboard(Component comp)
+    {
+        comp.addKeyListener(this);
+        currentKeys = new boolean[KEY_COUNT];
+        keys = new KeyState[KEY_COUNT];
+        for(int i = 0; i < KEY_COUNT; ++i)
+            keys[i] = KeyState.RELEASED;
+        isAltDown = isControlDown = isShiftDown = false;
+    }
+
+    public synchronized void checkKeyboardStatus()
+    {
+        for(int i = 0; i < KEY_COUNT; ++i)
+        {
+            // Set the key state
+            if(currentKeys[i])
+            {
+                // If the key is down now, but was not down last frame, set it to ONCE,
+                // otherwise, set it to PRESSED
+                if(keys[i] == KeyState.RELEASED)
+                    keys[i] = KeyState.ONCE;
+                else
+                    keys[i] = KeyState.PRESSED;
+            }
+            else
+                keys[i] = KeyState.RELEASED;
+        }
+    }
+
+    public synchronized boolean keyDown(int keyCode)
+    {
+        return keys[keyCode] == KeyState.ONCE || keys[keyCode] == KeyState.PRESSED;
+    }
+
+    public synchronized boolean keyDownOnce(int keyCode)
+    {
+        return keys[keyCode] == KeyState.ONCE;
+    }
+
+    public synchronized void keyPressed(KeyEvent e)
+    {
+        int keyCode = e.getKeyCode() & 0xff;
+        currentKeys[keyCode] = true;
+
+        isAltDown = e.isAltDown();
+        isControlDown = e.isControlDown();
+        isShiftDown = e.isShiftDown();
+        //e.consume();
+    }
+
+    public synchronized void keyReleased(KeyEvent e)
+    {
+        int keyCode = e.getKeyCode() & 0xff;
+        currentKeys[keyCode] = false;
+
+        isAltDown = e.isAltDown();
+        isControlDown = e.isControlDown();
+        isShiftDown = e.isShiftDown();
+        //e.consume();
+    }
+
+    public void keyTyped(KeyEvent e)
+    {
+        // Not needed
+        return;
+    }
+    
+}
